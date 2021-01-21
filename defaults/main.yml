@@ -1,0 +1,29 @@
+---
+user: webhook
+extra_groups: []
+download_url: "https://oss.help/builds/pub/webhook/2.6.10/webhook"
+checksum_url: "https://oss.help/builds/pub/webhook/2.6.10/SHA256SUMS"
+download_dir: /tmp
+scripts_dir: /usr/local/bin
+binary_dir: /usr/local/sbin
+conf_dir: /etc/webhook
+logs_dir: /var/log/webhook
+templates_dir: /usr/local/osshelp/webhook
+webhook_hooks_source_dir: hooks
+webhook_scripts_source_dir: scripts
+
+default_setup: false
+default_sudoers: true
+
+webhook:
+  hotreload: true
+  listen: '0.0.0.0'
+  port: '9000'
+  prefix: 'webhook'
+  verbose: true
+  hooks: []
+  headers: []
+
+templates: []
+
+webhook_sudo_scripts: [ lxhelper ]

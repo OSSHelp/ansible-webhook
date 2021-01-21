@@ -1,0 +1,74 @@
+#!/bin/bash
+
+wld_ver=1.1
+
+log_file="{{ logs_dir }}/${0##*/}.log"
+lock_file="/tmp/${0##*/}.lock"
+silent="no"
+user="webhook"
+err=0
+
+function show_notice() {
+  local -r log_date=$(date '+%Y/%m/%d %H:%M:%S')
+  test "${silent}" != "yes" && echo -e "[NOTICE ${log_date}] ${*}"; return 0;
+}
+
+function show_error() {
+  local -r log_date=$(date '+%Y/%m/%d %H:%M:%S')
+  echo -e "[ERROR ${log_date}] ${*}" >&2; return 1;
+}
+
+function make_flock() {
+    which flock > /dev/null 2>&1 || { show_error "No flock installed. You need to install flock first."; exit 1; }
+    exec 9>> "${lock_file:?}"
+    flock -n 9 || {
+        show_error "Sorry, ${0##*/} is already running. Please, wait until it's finished:\n"
+        which pstree > /dev/null 2>&1 && pstree -Alpacu "$(cat "${lock_file}")"
+        which pstree > /dev/null 2>&1 || { pid=$(cat "${lock_file}"); ps f "${pid}" -"${pid}"; }
+        exit 1
+    }
+    echo ${$} > "${lock_file}"
+}
+
+function show_result() {
+  test "${err}" -eq 0 && { echo -e "\nResult: success"; return 0; }
+  test "${err:?}" -eq 1 && { echo -e "\nResult: failure"; return 1; }
+  return "${err}"
+}
+
+function show_usage() {
+  echo -e "Usage: ${0##*/} yaml_url download_transport container_name [profile]" >&2
+}
+
+function check_user() {
+  test "$(whoami)" == "${user}" || { show_error "You are using script as user $(whoami), but you need to run it as ${user}!"; err=1; }
+}
+
+function check_dependencies() {
+  test -f /usr/local/sbin/lxhelper || { show_error "Can't find lxhelper script!"; exit 1; }
+}
+
+function run_lxhelper() {
+  local yaml_url="${1}"; local download_transport=${2:-http}; local container_name="${3}"; local profile="${4:-default}"
+  test -n "${container_name}" && {
+    sudo /usr/local/sbin/lxhelper deploy-container -t="${download_transport}" -y="${yaml_url}" --profile="${profile}" "${container_name}" || \
+      err=1
+  }
+  test -z "${container_name}" && {
+    sudo /usr/local/sbin/lxhelper deploy-containers -t="${download_transport}" -y="${yaml_url}" --profile="${profile}" || \
+      err=1
+  }
+}
+
+function main() {
+  make_flock
+  check_user
+  check_dependencies
+  run_lxhelper "${@}" >> "${log_file}" 2>&1
+  show_result
+}
+
+{% raw %}
+test "${#}" -lt 2 -o "${#}" -gt 4 && { show_usage; exit 1;}
+{% endraw %}
+main "${@}"

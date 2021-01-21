@@ -1,0 +1,38 @@
+#!/bin/bash
+
+scriptname="${0##*/}"
+lib_path="/usr/local/include/osshelp/deploy-functions.sh"
+log_file="/var/log/${scriptname}.log"
+
+exit_code=1
+
+default_profile="/usr/local/osshelp/profiles/default.yml"
+webhook_cfg_dir='/etc/webhook'
+
+test -r "${lib_path}" || { echo "Library ${lib_path} doesn't exist!"; exit 1; }
+test -r "${lib_path}" && . "${lib_path}" "${@}"
+
+# profile doesn't exists, don't do anything
+test -r "${default_profile}" || exit_code=0
+
+# we should edit config
+test -r "${default_profile}" && {
+  errors_detected=0
+
+  # update secret
+  test -d "${webhook_cfg_dir}" && {
+    for filename in $(find "${webhook_cfg_dir}" -type f -name *.json -printf "%f\n"); do
+      grep -q secret_placeholder "${webhook_cfg_dir}/${filename}" || continue
+      key_exists_in_current_yml "webhook.[${filename}]" && {
+        key_exists_in_current_yml "webhook.[${filename}].secret" && {
+          secret=$(get_value "webhook.[${filename}].secret" "${yml_current}")
+          sed -ri "s/secret_placeholder/${secret}/g" "${webhook_cfg_dir}/${filename}"
+          test $? -gt 0 && errors_detected = 1
+        }
+      }
+    done
+  }
+  exit_code=${errors_detected}
+}
+
+exit "${exit_code}"

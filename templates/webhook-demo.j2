@@ -1,0 +1,13 @@
+[
+  {
+    "id": "demo",
+    "execute-command": "{{ binary_dir }}/webhook",
+    "command-working-directory": "/tmp",
+    "pass-arguments-to-command": [
+     { "source": "string", "name": "--version" }
+    ],
+    "include-command-output-in-response": true,
+    "include-command-output-in-response-on-error": true,
+    "response-message": "Redeploy started!"
+  }
+]

@@ -1,0 +1,84 @@
+[
+  {
+    "id": "lxhelper-deployment",
+    "response-message": "Starting LXHelper deployment ...",
+    "execute-command": "{{ scripts_dir | default('/usr/local/bin', true) }}/webhook-lxhelper-deployment",
+    "command-working-directory": "/tmp",
+    "pass-arguments-to-command": [
+      {
+        "source": "payload",
+        "name": "params.manifest"
+      },
+      {
+        "source": "payload",
+        "name": "params.transport"
+      },
+      {
+        "source": "payload",
+        "name": "params.target"
+      },
+      {
+        "source": "payload",
+        "name": "params.profile"
+      }
+    ],
+    "include-command-output-in-response": true,
+    "include-command-output-in-response-on-error": true,
+    "response-message": "Redeploy started!",
+    "trigger-rule-mismatch-http-response-code": 400,
+    "trigger-rule": {
+      "and": [
+        {
+          "match": {
+            "type": "value",
+            "value": "{{ lxhelper_deployment['token'] | default('VeryUniqueStingHere',true) }}",
+            "parameter": {
+              "source": "payload",
+              "name": "params.token"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "regex",
+            "regex": "^(http(s?):\\/\\/|\\/)[\\w+\\.\\-\\/\\@\\:]+\\w+\\.yml$",
+            "parameter": {
+              "source": "payload",
+              "name": "params.manifest"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "regex",
+            "regex": "^(http|s3)$",
+            "parameter": {
+              "source": "payload",
+              "name": "params.transport"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "regex",
+            "regex": "{{ lxhelper_deployment['target_regex'] | default('^demo$',true) }}",
+            "parameter": {
+              "source": "payload",
+              "name": "params.target"
+            }
+          }
+        },
+        {
+          "match": {
+            "type": "regex",
+            "regex": "^([\\w\\d-]+|)$",
+            "parameter": {
+              "source": "payload",
+              "name": "params.profile"
+            }
+          }
+        }
+      ]
+    }
+  }
+]

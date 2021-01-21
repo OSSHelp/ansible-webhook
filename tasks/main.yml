@@ -1,0 +1,141 @@
+---
+# tasks file for webhook
+
+- name: create group
+  group:
+    name: "{{ user }}"
+    system: yes
+    state: present
+
+- name: create user
+  user:
+    name: "{{ user }}"
+    group: "{{ user }}"
+    groups: "{{ extra_groups }}"
+    shell: "/bin/bash"
+    system: yes
+    comment: "Webhook user"
+    state: present
+
+- name: create binary dir if necesary
+  file:
+    path: "{{ binary_dir }}"
+    state: directory
+
+- name: create logs dir if necesary
+  file:
+    path: "{{ logs_dir }}"
+    state: directory
+    owner: "root"
+    group: "{{ user }}"
+    mode: 0770
+
+- name: download binary
+  get_url:
+    url: "{{ download_url }}"
+    checksum: "sha256:{{ checksum_url }}"
+    dest: "{{ binary_dir }}/webhook"
+    owner: "root"
+    group: "root"
+    mode: 0755
+  when: not ansible_check_mode
+  notify: restart webhook service
+
+- name: create conf dir if necessary
+  file:
+    path: "{{ conf_dir }}"
+    state: directory
+    owner: "root"
+    group: "{{ user }}"
+    mode: 0750
+
+- name: copy demo webhook
+  template:
+    src: webhook-demo.j2
+    dest: "{{ conf_dir }}/demo.json"
+    owner: root
+    group: "{{ user }}"
+    mode: 0640
+  when: not webhook.hooks
+  notify: restart webhook service
+
+- name: 'copy webhook'
+  template:
+    src: '{{ webhook_hooks_source_dir }}/{{ item }}.j2'
+    dest: "{{ conf_dir }}/{{ item | basename }}.json"
+    owner: root
+    group: "{{ user }}"
+    mode: 0640
+  when: webhook.hooks is defined and webhook.hooks | length > 0
+  with_items: "{{ webhook.hooks }}"
+  notify: restart webhook service
+
+- name: 'copy scripts'
+  template:
+    src: '{{ webhook_scripts_source_dir }}/webhook-{{ item }}.j2'
+    dest: "{{ scripts_dir }}/webhook-{{ item | basename }}"
+    owner: root
+    group: "{{ user }}"
+    mode: 0750
+  when: webhook.scripts is defined and webhook.scripts | length > 0
+  with_items: "{{ webhook.scripts }}"
+  notify: restart webhook service
+
+- name: include deploy-functions
+  include_role:
+    name: deploy-functions
+  when: default_setup and deploy_functions_installed is not defined
+
+- name: create tpl directory
+  file:
+    path: "{{ templates_dir }}"
+    state: directory
+    owner: "root"
+    group: "{{ user }}"
+    mode: 0750
+  when: default_setup
+
+- name: place initial-setup script
+  template:
+    src: initial-setup.j2
+    dest: "{{ templates_dir }}/initial-setup"
+    owner: "root"
+    group: "{{ user }}"
+    mode: 0750
+  when: default_setup
+
+- name: 'copy templates'
+  copy:
+    src: 'templates/{{ item }}'
+    dest: "{{ templates_dir }}/{{ item | basename }}"
+    owner: root
+    group: "{{ user }}"
+    mode: 0750
+  when: default_setup and templates
+  with_items: "{{ templates }}"
+
+- name: copy systemd unit file
+  template:
+    src: webhook-systemd-unit.j2
+    dest: "/etc/systemd/system/webhook.service"
+    owner: root
+    group: root
+    mode: 0644
+  notify:
+    - reload webhook unit
+    - restart webhook service
+
+- name: enable service
+  service:
+    name: webhook
+    state: started
+    enabled: yes
+
+- name: install sudoers config
+  template:
+    src: sudoers.j2
+    dest: "/etc/sudoers.d/{{ user }}"
+    owner: root
+    group: root
+    mode: 0440
+  when: default_sudoers
