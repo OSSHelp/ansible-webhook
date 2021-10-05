@@ -1,6 +1,6 @@
 ## For webhooks
 {% if webhook_sudo_scripts is defined and webhook_sudo_scripts|length %}
 {% for script_name in webhook_sudo_scripts %}
-{{ user }} ALL=(root)NOPASSWD: {{ binary_dir }}/{{ script_name }}
+{{ user }} ALL=(root)NOPASSWD:SETENV: {{ binary_dir }}/{{ script_name }}
 {% endfor %}
 {% endif %}
