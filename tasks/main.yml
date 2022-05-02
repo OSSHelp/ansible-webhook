@@ -1,17 +1,16 @@
 ---
-# tasks file for webhook
 
 - name: create group
   group:
-    name: "{{ user }}"
+    name: "{{ webhook_user }}"
     system: yes
     state: present
 
 - name: create user
   user:
-    name: "{{ user }}"
-    group: "{{ user }}"
-    groups: "{{ extra_groups }}"
+    name: "{{ webhook_user }}"
+    group: "{{ webhook_user }}"
+    groups: "{{ webhook_extra_groups }}"
     shell: "/bin/bash"
     system: yes
     comment: "Webhook user"
@@ -19,22 +18,22 @@
 
 - name: create binary dir if necesary
   file:
-    path: "{{ binary_dir }}"
+    path: "{{ webhook_dirs.binary }}"
     state: directory
 
 - name: create logs dir if necesary
   file:
-    path: "{{ logs_dir }}"
+    path: "{{ webhook_dirs.logs }}"
     state: directory
     owner: "root"
-    group: "{{ user }}"
+    group: "{{ webhook_user }}"
     mode: 0770
 
 - name: download binary
   get_url:
-    url: "{{ download_url }}"
-    checksum: "sha256:{{ checksum_url }}"
-    dest: "{{ binary_dir }}/webhook"
+    url: "{{ webhook_download.url }}"
+    checksum: "sha256:{{ webhook_download.checksum }}"
+    dest: "{{ webhook_dirs.binary }}/webhook"
     owner: "root"
     group: "root"
     mode: 0755
@@ -43,80 +42,78 @@
 
 - name: create conf dir if necessary
   file:
-    path: "{{ conf_dir }}"
+    path: "{{ webhook_dirs.conf }}"
     state: directory
     owner: "root"
-    group: "{{ user }}"
+    group: "{{ webhook_user }}"
     mode: 0750
 
-- name: copy demo webhook
+- name: prepare variables for main cfg generation
+  set_fact:
+    webhooks_merged: "{{ webhook_custom_hooks }}"
+  when: webhook_disable_default_hooks
+
+- name: prepare variables for main cfg generation
+  set_fact:
+    webhooks_merged: "{{ webhook_default_hooks + webhook_custom_hooks }}"
+  when: not webhook_disable_default_hooks
+
+- name: generate hooks
   template:
-    src: webhook-demo.j2
-    dest: "{{ conf_dir }}/demo.json"
+    src: webhooks.j2
+    dest: "{{ webhook_dirs.conf }}/webhooks.json"
     owner: root
-    group: "{{ user }}"
+    group: "{{ webhook_user }}"
     mode: 0640
-  when: not webhook.hooks
   notify: restart webhook service
 
-- name: 'copy webhook'
+- name: copy scripts
   template:
-    src: '{{ webhook_hooks_source_dir }}/{{ item }}.j2'
-    dest: "{{ conf_dir }}/{{ item | basename }}.json"
+    src: '{{ webhook_dirs.scripts_source }}/webhook-{{ item }}.j2'
+    dest: "{{ webhook_dirs.scripts }}/webhook-{{ item | basename }}"
     owner: root
-    group: "{{ user }}"
-    mode: 0640
-  when: webhook.hooks is defined and webhook.hooks | length > 0
-  with_items: "{{ webhook.hooks }}"
-  notify: restart webhook service
-
-- name: 'copy scripts'
-  template:
-    src: '{{ webhook_scripts_source_dir }}/webhook-{{ item }}.j2'
-    dest: "{{ scripts_dir }}/webhook-{{ item | basename }}"
-    owner: root
-    group: "{{ user }}"
+    group: "{{ webhook_user }}"
     mode: 0750
-  when: webhook.scripts is defined and webhook.scripts | length > 0
-  with_items: "{{ webhook.scripts }}"
+  when: webhook_params.scripts is defined and webhook_params.scripts | length > 0
+  with_items: "{{ webhook_params.scripts }}"
   notify: restart webhook service
 
 - name: include deploy-functions
   include_role:
     name: deploy-functions
-  when: default_setup and deploy_functions_installed is not defined
+  when: webhook_default_setup and deploy_functions_installed is not defined
 
 - name: create tpl directory
   file:
-    path: "{{ templates_dir }}"
+    path: "{{ webhook_dirs.templates }}"
     state: directory
     owner: "root"
-    group: "{{ user }}"
+    group: "{{ webhook_user }}"
     mode: 0750
-  when: default_setup
+  when: webhook_default_setup
 
 - name: place initial-setup script
   template:
     src: initial-setup.j2
-    dest: "{{ templates_dir }}/initial-setup"
+    dest: "{{ webhook_dirs.templates }}/initial-setup"
     owner: "root"
-    group: "{{ user }}"
+    group: "{{ webhook_user }}"
     mode: 0750
-  when: default_setup
+  when: webhook_default_setup
 
-- name: 'copy templates'
+- name: copy templates
   copy:
-    src: 'templates/{{ item }}'
-    dest: "{{ templates_dir }}/{{ item | basename }}"
+    src: "templates/{{ item }}"
+    dest: "{{ webhook_dirs.templates }}/{{ item | basename }}"
     owner: root
-    group: "{{ user }}"
+    group: "{{ webhook_user }}"
     mode: 0750
-  when: default_setup and templates
-  with_items: "{{ templates }}"
+  when: webhook_default_setup and webhook_templates
+  with_items: "{{ webhook_templates }}"
 
 - name: copy systemd unit file
   template:
-    src: webhook-systemd-unit.j2
+    src: systemd-unit.j2
     dest: "/etc/systemd/system/webhook.service"
     owner: root
     group: root
@@ -134,8 +131,8 @@
 - name: install sudoers config
   template:
     src: sudoers.j2
-    dest: "/etc/sudoers.d/{{ user }}"
+    dest: "/etc/sudoers.d/{{ webhook_user }}"
     owner: root
     group: root
     mode: 0440
-  when: default_sudoers
+  when: webhook_default_sudoers

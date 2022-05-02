@@ -7,48 +7,53 @@ Ansible role for [webhook](https://github.com/adnanh/webhook) installation and c
 ## Usage (example)
 
 ```yaml
-    - hosts: all
-      roles:
-        - { role: webhook,
-              webhook: {
-              hotreload: true,
-              listen: '0.0.0.0',
-              port: 8080,
-              prefix: 'webhook',
-              verbose: false,
-              hooks: [ 'deployment' ],
-              headers: [ 'X-Custom-Header=some-value' ]
-            }
-        }
+    - role: webhook
+      webhook_default_setup: true
+      webhook_extra_groups: [nogroup, users]
+      webhook_params:
+        hotreload: true
+        listen: 0.0.0.0
+        port: 12345
+        prefix: hook
+        verbose: true
+        scripts: ['lxhelper-deployment']
+        headers: ['X-Data-Source=demo']
+      webhook_lxhelper_deployment:
+        token: token_placeholder
+        target_regex: '^(testing|someclient)$'
+      webhook_custom_hooks:
+        - id: uptime
+          execute-command: uptime
+          command-working-directory: /tmp
+          include-command-output-in-response: true
+          include-command-output-in-response-on-error: true
 ```
+
+For example of advanced custom webhooks configuration check `webhook_default_hooks` list in [defaults](defaults/main.yml).
 
 ## Available parameters
 
 ### Main
 
-Short description here.
-
-| Param | Description |
-| -------- | -------- |
-| user | User to create for webhook-server. |
-| extra_groups | Extra groups to add created user to. |
-| download_url | Url to get binary from. |
-| checksum_url | Url to get checksums from. |
-| download_dir | Absolute path to temporal dir for binary placement before moving to more suitable dir. |
-| binary_dir | Absolute path to directory where binary will be placed. |
-| scripts_dir | Absolute path to directory where scripts will be placed. |
-| conf_dir | Absolute path to directory with webhook-server configuration files. |
-| logs_dir | Absolute path to directory that will be used for webhook-server logs storage. |
-| templates_dir | Absolute path to directory that will be used for initial-setup script and templates placement. |
-| webhook_hooks_source_dir | Relative path to hooks (j2-templates of jsons) in current repository |
-| webhook_scripts_source_dir | Relative path to scripts templates in current repository |
-| default_setup | Whether to install [deploy-functions](https://gitea.osshelp.ru/ansible/deploy-functions) and additional stuff for initial setup via deployment. |
-| default_sudoers |  Whether to generate sudoers.d config |
-| webhook_sudo_scripts | List of script names in scripts_dir for enabling sudo access to |
+| Param | Default | Description |
+| -------- | -------- | -------- |
+| `webhook_version` | `2.6.10` | Version to install, is being used in default binary/checksum urls. |
+| `webhook_user` | `webhook` | User to create for webhook-server. |
+| `webhook_extra_groups` | `[]` | Extra groups to add created user to. |
+| `webhook_default_hooks` | See [defaults](defaults/main.yml) | List, describing default webhooks. |
+| `webhook_disable_default_hooks` | `false` | If set to `true` no default webhooks will be added. |
+| `webhook_custom_hooks` | `[]` | List, describing custom webhooks. Will be appended to `webhook_default_hooks` if `webhook_disable_default_hooks` is set to `false`. |
+| `webhook_download.url` | See [defaults](defaults/main.yml) | Url to get binary from. |
+| `webhook_download.checksum` | See [defaults](defaults/main.yml) | Url to get checksums from. |
+| `webhook_dirs` | See [defaults](defaults/main.yml) | Absolute path to directories (download, scripts, binary, conf, logs, templates) |
+| `webhook_dirs.scripts_source` | `scripts` | Relative path to scripts j2-templates in current repository |
+| `webhook_default_setup` | `false` | Whether to install [deploy-functions](https://gitea.osshelp.ru/ansible/deploy-functions) and additional stuff for initial setup during deployment. |
+| `webhook_default_sudoers` | `true` |  Whether to generate sudoers.d config |
+| `webhook_sudo_scripts` | `[lxhelper]` | List of script names in `webhook_dirs.scripts` for enabling sudo access to |
 
 ### Webhook-server params
 
-You can control all of the params via overriding webhook array (see defaults/main.yml)
+You can control all of the params via overriding `webhook_params` array (see [defaults](defaults/main.yml))
 
 ## FAQ
 
@@ -61,7 +66,7 @@ If there is an error like this in logs:
 Then you should use double character ‘\’ in your regexps. For example:
 
 ```yaml
-    "regex": "^\\w+(\\d+)?(-\\w+)?-(prod)$",
+regex: "^\\w+(\\d+)?(-\\w+)?-(prod)$"
 ```
 
 ## Useful links
@@ -71,7 +76,7 @@ Then you should use double character ‘\’ in your regexps. For example:
 
 ## TODO
 
-- add logrotate config for files in logs_dir
+- add logrotate config
 
 ## License
 

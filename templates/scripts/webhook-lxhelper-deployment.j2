@@ -2,10 +2,10 @@
 
 wld_ver=1.1
 
-log_file="{{ logs_dir }}/${0##*/}.log"
+log_file="{{ webhook_dirs.logs }}/${0##*/}.log"
 lock_file="/tmp/${0##*/}.lock"
 silent="no"
-user="webhook"
+user="{{ webhook_user }}"
 err=0
 
 function show_notice() {

@@ -1,29 +1,79 @@
 ---
-user: webhook
-extra_groups: []
-download_url: "https://oss.help/builds/pub/webhook/2.6.10/webhook"
-checksum_url: "https://oss.help/builds/pub/webhook/2.6.10/SHA256SUMS"
-download_dir: /tmp
-scripts_dir: /usr/local/bin
-binary_dir: /usr/local/sbin
-conf_dir: /etc/webhook
-logs_dir: /var/log/webhook
-templates_dir: /usr/local/osshelp/webhook
-webhook_hooks_source_dir: hooks
-webhook_scripts_source_dir: scripts
 
-default_setup: false
-default_sudoers: true
+webhook_version: 2.6.10
+webhook_download:
+  url: "https://oss.help/builds/pub/webhook/{{ webhook_version }}/webhook"
+  checksum: "https://oss.help/builds/pub/webhook/{{ webhook_version }}/SHA256SUMS"
 
-webhook:
+webhook_user: webhook
+webhook_extra_groups: []
+
+webhook_dirs:
+  download: /tmp
+  scripts: /usr/local/bin
+  binary: /usr/local/sbin
+  conf: /etc/webhook
+  logs: /var/log/webhook
+  templates: /usr/local/osshelp/webhook
+  scripts_source: scripts
+
+webhook_default_setup: false
+webhook_default_sudoers: true
+
+webhook_params:
   hotreload: true
-  listen: '0.0.0.0'
-  port: '9000'
-  prefix: 'webhook'
+  listen: 0.0.0.0
+  port: 9000
+  prefix: webhook
   verbose: true
-  hooks: []
   headers: []
 
-templates: []
-
+webhook_templates: []
 webhook_sudo_scripts: [ lxhelper ]
+webhook_disable_default_hooks: false
+webhook_custom_hooks: []
+webhook_default_hooks:
+  - id: lxhelper-deployment
+    response-message: Starting LXHelper deployment...
+    execute-command: "{{ scripts_dir | default('/usr/local/bin', true) }}/webhook-lxhelper-deployment"
+    command-working-directory: /tmp
+    include-command-output-in-response: true
+    include-command-output-in-response-on-error: true
+    trigger-rule-mismatch-http-response-code: 400
+    pass-arguments-to-command:
+      - { source: payload, name: params.manifest }
+      - { source: payload, name: params.transport }
+      - { source: payload, name: params.target }
+      - { source: payload, name: params.profile }
+    trigger-rule:
+      and:
+        - match:
+            type: value
+            value: "{{ webhook_lxhelper_deployment['token'] | default('VeryUniqueStingHere',true) }}"
+            parameter:
+              source: payload
+              name: params.token
+        - match:
+            type: regex
+            regex: "^(http(s?):\\/\\/|\\/)[\\w+\\.\\-\\/\\@\\:]+\\w+\\.yml$"
+            parameter:
+              source: payload
+              name: params.manifest
+        - match:
+            type: regex
+            regex: "^(http|s3)$"
+            parameter:
+              source: payload
+              name: params.transport
+        - match:
+            type: regex
+            regex: "{{ webhook_lxhelper_deployment['target_regex'] | default('^demo$',true) }}"
+            parameter:
+              source: payload
+              name: params.target
+        - match:
+            type: regex
+            regex: "^([\\w\\d-]+|)$"
+            parameter:
+              source: payload
+              name: params.profile

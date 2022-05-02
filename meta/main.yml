@@ -9,6 +9,7 @@ galaxy_info:
     - name: Ubuntu
       versions:
         - xenial
-          bionic
+        - bionic
+        - focal
   galaxy_tags:
     - webhook

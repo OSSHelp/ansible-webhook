@@ -1,0 +1,37 @@
+[Unit]
+Description=Webhook
+Documentation=https://github.com/adnanh/webhook/wiki
+Wants=network-online.target
+After=network-online.target
+
+[Service]
+User={{ webhook_user }}
+Group={{ webhook_user }}
+
+ExecStart={{ webhook_dirs.binary }}/webhook \
+ -hooks '{{ webhook_dirs.conf }}/webhooks.json' \
+{% if webhook_params.headers is defined and webhook_params.headers|length %}
+{% for header in webhook_params.headers %}
+ -header '{{ header }}' \
+{% endfor %}
+{% endif %}
+ -ip '{{ webhook_params.listen }}' -port {{ webhook_params.port }} -urlprefix '{{ webhook_params.prefix }}'{% if webhook_params.verbose %} -verbose {% endif %}{% if webhook_params.hotreload %} -hotreload{% endif %}
+
+{% if webhook_default_setup is sameas true %}
+{% if ansible_distribution_release == 'focal' %}
+ExecStartPre=+{{ webhook_dirs.templates }}/initial-setup
+{% elif ansible_distribution_release == 'bionic' %}
+ExecStartPre=+{{ webhook_dirs.templates }}/initial-setup
+{% elif ansible_distribution_release == 'xenial' %}
+PermissionsStartOnly=true
+ExecStartPre={{ webhook_dirs.templates }}/initial-setup
+{% endif %}
+{% endif %}
+Restart=always
+
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=webhook
+
+[Install]
+WantedBy=multi-user.target
